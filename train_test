@@ -1,0 +1,40 @@
+# --- Part 3: Train/Test Evaluation ---
+
+set.seed(123) # reproducibility
+n <- nrow(data)
+train_idx <- sample(seq_len(n), size = 0.9 * n)
+train_data <- data[train_idx, ]
+test_data <- data[-train_idx, ]
+
+# Fit model on training set
+fit_train <- betareg(formula, data = train_data, link = "logit")
+
+# Predict on test set
+preds <- predict(fit_train, newdata = test_data, type = "response")
+
+# Compare predictions to actual
+mse <- mean((preds - test_data$PER_normalized)^2)
+rmse <- sqrt(mse)
+mae <- mean(abs(preds - test_data$PER_normalized))
+
+cat("Test Set Performance:\n")
+cat("MSE =", round(mse, 4), " RMSE =", round(rmse, 4), " MAE =", round(mae, 4), "\n")
+
+# Plot predicted vs actual
+png("pred_vs_actual.png", width = 800, height = 600)
+plot(test_data$PER_normalized, preds,
+     xlab = "Actual PER_normalized", ylab = "Predicted PER_normalized",
+     main = "Predicted vs. Actual PER (Test Set)",
+     pch = 19, col = rgb(0.2, 0.4, 0.6, 0.6))
+abline(0, 1, col = "red", lwd = 2)
+
+# Add LOWESS trend
+lines(lowess(test_data$PER_normalized, preds), col = "green", lwd = 2)
+
+# Add R²
+r2 <- 1 - sum((test_data$PER_normalized - preds)^2) / 
+          sum((test_data$PER_normalized - mean(test_data$PER_normalized))^2)
+legend("topleft", legend = paste("R² =", round(r2, 3)),
+       bty = "n", cex = 1.2, text.col = "blue")
+
+dev.off()
