@@ -1,0 +1,261 @@
+# Load required libraries
+library(ggplot2)
+library(dplyr)     # For data manipulation
+library(gridExtra) # For arranging plots
+
+# --- 1. Load and Prepare the Data ---
+data <- read.csv("C:/Users/parul/Downloads/dataset/model.csv", header = FALSE, stringsAsFactors = FALSE, check.names = FALSE)
+
+# Explicitly assign descriptive column names based on the data structure
+colnames(data) <- c(
+  "Index", "Player", "POS", "HGT", "WGT", "BMI", "WNGSPN", "STNDVERT", "LPVERT", "LANE", "SPRINT",
+  "G", "MP", "FG", "FGA", "X3P", "X3PA", "FT", "FTA", "ORB", "TRB", "AST", "STL", "BLK", "TOV", "PF", "PTS",
+  "FGP", "X3PP", "FTP", "MPG", "PPG", "RPG", "APG", "gp", "pts", "reb", "ast", "PER", "PER_normalized"
+)
+
+# --- 2. Define Predictors to Include and Exclude ---
+predictors_to_include <- c(
+  "POS", "HGT", "WGT", "BMI", "WNGSPN", "STNDVERT", "LPVERT", "LANE", "SPRINT",
+  "MP", "FG", "FGA", "X3P", "X3PA", "FT", "FTA", "ORB", "TRB", "AST",
+  "PF", "PTS", "FGP", "X3PP", "FTP", "PPG", "RPG", "APG", "gp", "PER", "PER_normalized"
+)
+
+predictors_to_exclude <- c("G", "STL", "BLK", "TOV", "MPG") # Explicitly excluded as per your request
+
+# Final list of predictors to plot
+final_predictors <- intersect(predictors_to_include, names(data))
+
+# Categorize variables
+categorical_vars <- c("POS")
+continuous_vars <- setdiff(final_predictors, categorical_vars)
+
+# Descriptions for the variables
+variable_descriptions <- list(
+  POS = "Position",
+  HGT = "Height (inches)",
+  WGT = "Weight (lbs)",
+  BMI = "Body Mass Index",
+  WNGSPN = "Wingspan (inches)",
+  STNDVERT = "Standing Vertical Leap (inches)",
+  LPVERT = "Launching Vertical Leap (inches)",
+  LANE = "Lane Agility Time (seconds)",
+  SPRINT = "Sprint Time (seconds)",
+  MP = "Minutes Played",
+  FG = "Field Goals Made",
+  FGA = "Field Goals Attempted",
+  X3P = "Three Pointers Made",
+  X3PA = "Three Pointers Attempted",
+  FT = "Free Throws Made",
+  FTA = "Free Throws Attempted",
+  ORB = "Offensive Rebounds",
+  TRB = "Total Rebounds",
+  AST = "Assists",
+  PF = "Personal Fouls",
+  PTS = "Points Scored",
+  FGP = "Field Goal Percentage",
+  X3PP = "Three Point Percentage",
+  FTP = "Free Throw Percentage",
+  PPG = "Points Per Game",
+  RPG = "Rebounds Per Game",
+  APG = "Assists Per Game",
+  gp = "Games Played (gp)",
+  PER = "Player Efficiency Rating",
+  PER_normalized = "Normalized Player Efficiency Rating"
+)
+
+# --- 3. Function to Create Individual Plots ---
+create_single_plot <- function(data, var_name, var_type) {
+  description <- variable_descriptions[[var_name]]
+  
+  if (is.null(description) || description == "") {
+    description <- var_name
+    warning(paste("No description provided for variable:", var_name))
+  }
+  
+  if (!(var_name %in% names(data))) {
+    message(paste("Variable", var_name, "not found in data. Skipping."))
+    return(NULL)
+  }
+  
+  var_data <- data[[var_name]]
+  if (length(var_data) == 0 || all(is.na(var_data))) {
+    message(paste("Variable", var_name, "has no data. Skipping."))
+    return(NULL)
+  }
+  
+  if (var_type == "continuous") {
+    var_data <- suppressWarnings(as.numeric(as.character(var_data)))
+    if (sum(!is.na(var_data)) / length(var_data) < 0.5) {
+      message(paste("Variable", var_name, "failed numeric conversion, treating as categorical."))
+      var_type <- "categorical"
+      var_data <- data[[var_name]]
+    } else {
+      data_plot <- data.frame(value = var_data)
+    }
+  }
+  
+  if (var_type == "categorical") {
+    data_plot <- data.frame(value = var_data)
+  }
+  
+  title_text <- paste0(var_name, ": ", description)
+  
+  if (var_type == "categorical") {
+    counts <- table(data_plot$value, useNA = "ifany")
+    df_counts <- data.frame(Category = names(counts), Count = as.numeric(counts))
+    df_counts <- df_counts[!is.na(df_counts$Category) & df_counts$Category != "", , drop=FALSE]
+    if(nrow(df_counts) == 0) {
+      message(paste("Variable", var_name, "has no valid categories to plot. Skipping bar chart."))
+      return(NULL)
+    }
+    
+    p <- ggplot(df_counts, aes(x = reorder(Category, Count), y = Count)) +
+      geom_bar(stat = "identity", fill = "steelblue") +
+      coord_flip() +
+      labs(title = title_text, x = var_name, y = "Count") +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(size = 10, hjust = 0.5),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(size = 8)
+      )
+    
+  } else if (var_type == "continuous") {
+    if (length(unique(data_plot$value[!is.na(data_plot$value)])) <= 1) {
+      message(paste("Variable", var_name, "has only one unique value or is constant. Skipping histogram."))
+      return(NULL)
+    }
+    data_plot_hist <- data_plot[!is.na(data_plot$value), , drop=FALSE]
+    if(nrow(data_plot_hist) == 0) {
+      message(paste("Variable", var_name, "has no non-NA values for histogram. Skipping."))
+      return(NULL)
+    }
+    
+    IQR_val <- IQR(data_plot_hist$value, na.rm = TRUE)
+    n <- length(data_plot_hist$value)
+    if (IQR_val > 0 && n > 1) {
+      bin_width_fd <- 2 * IQR_val / (n^(1/3))
+      if (bin_width_fd > 0) {
+        data_range <- max(data_plot_hist$value, na.rm = TRUE) - min(data_plot_hist$value, na.rm = TRUE)
+        bins_fd <- round(data_range / bin_width_fd)
+        bins_fd <- max(10, min(bins_fd, 100))
+      } else {
+        bins_fd <- 30
+      }
+    } else {
+      bins_fd <- 30
+    }
+    
+    p <- ggplot(data_plot_hist, aes_string(x = "value")) +
+      geom_histogram(bins = bins_fd, fill = "lightblue", color = "black", alpha = 0.7) +
+      labs(title = title_text, x = var_name, y = "Frequency") +
+      theme_minimal() +
+      theme(
+        plot.title = element_text(size = 10, hjust = 0.5),
+        axis.title = element_text(size = 9),
+        axis.text = element_text(size = 8)
+      )
+    
+  } else {
+    stop("var_type must be either 'categorical' or 'continuous'")
+  }
+  return(p)
+}
+
+# --- 4. Generate All Individual Plots ---
+cat("Generating individual plots for all specified predictors...\n")
+
+all_individual_plots <- list()
+
+valid_categorical_vars <- intersect(categorical_vars, names(data))
+valid_continuous_vars <- intersect(continuous_vars, names(data))
+
+for (var_name in valid_categorical_vars) {
+  p <- create_single_plot(data, var_name, "categorical")
+  if (!is.null(p)) {
+    all_individual_plots[[var_name]] <- p
+  }
+}
+
+for (var_name in valid_continuous_vars) {
+  p <- create_single_plot(data, var_name, "continuous")
+  if (!is.null(p)) {
+    all_individual_plots[[var_name]] <- p
+  }
+}
+
+# --- 5. Combine Plots into Horizontal Grids ---
+output_dir <- "horizontal_predictor_plots"
+dir.create(output_dir, showWarnings = FALSE)
+
+if(length(all_individual_plots) == 0) {
+  cat("No individual plots were generated. Cannot create horizontal grids.\n")
+} else {
+  # Define thematic groups
+  physical_attrs <- c("HGT", "WGT", "BMI", "WNGSPN")
+  athleticism <- c("STNDVERT", "LPVERT", "LANE", "SPRINT")
+  game_stats_counts <- c("MP", "FG", "FGA", "X3P", "X3PA", "FT", "FTA", "ORB", "TRB", "AST", "PF", "PTS")
+  game_stats_pct <- c("FGP", "X3PP", "FTP", "PPG", "RPG", "APG", "gp", "PER", "PER_normalized")
+  position <- c("POS")
+  
+  # Helper function to save a horizontal grid
+  save_horizontal_grid <- function(group_name, vars, title) {
+    group_plots <- all_individual_plots[intersect(vars, names(all_individual_plots))]
+    if(length(group_plots) == 0) {
+      message(paste("No plots found for group:", group_name))
+      return()
+    }
+    
+    # Define maximum number of plots per row
+    max_per_row <- 5
+    
+    # Calculate how many rows we need
+    num_rows <- ceiling(length(group_plots) / max_per_row)
+    
+    # Create a list to hold the plots for this grid
+    grid_plots <- list()
+    
+    # Loop through each row
+    for (row in 1:num_rows) {
+      start_idx <- (row - 1) * max_per_row + 1
+      end_idx <- min(row * max_per_row, length(group_plots))
+      
+      # Extract the plots for this row
+      row_plots <- group_plots[start_idx:end_idx]
+      
+      # Arrange the plots in this row horizontally
+      row_arrangement <- do.call(grid.arrange, c(row_plots, ncol = length(row_plots)))
+      
+      # Add this row arrangement to our list
+      grid_plots[[row]] <- row_arrangement
+    }
+    
+    # Now arrange all the rows vertically to form the final grid
+    final_grid <- do.call(grid.arrange, c(grid_plots, ncol = 1))
+    
+    filename <- file.path(output_dir, paste0("predictor_distributions_", group_name, ".png"))
+    
+    tryCatch({
+      ggsave(
+        filename,
+        plot = final_grid,
+        width = 16,   # Increased width for multiple plots side-by-side
+        height = 10 + (num_rows - 1) * 2, # Dynamic height: base + extra for each additional row
+        dpi = 300,
+        bg = "white"
+      )
+      cat("Saved horizontal grid:", filename, "\n")
+    }, error = function(e) {
+      cat("Error saving horizontal grid for group", group_name, ":", e$message, "\n")
+    })
+  }
+  
+  # Save each thematic group as a horizontal grid
+  save_horizontal_grid("physical_attrs", physical_attrs, "Physical Attributes")
+  save_horizontal_grid("athleticism", athleticism, "Athleticism Measures")
+  save_horizontal_grid("game_stats_counts", game_stats_counts, "Game Statistics (Counts/Totals)")
+  save_horizontal_grid("game_stats_pct", game_stats_pct, "Game Statistics (Percentages/Averages)")
+  save_horizontal_grid("position", position, "Categorical: Position")
+  
+  cat("\nAll horizontal grid plots saved to the '", output_dir, "' directory.\n")
+}
