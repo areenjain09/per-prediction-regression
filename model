@@ -1,0 +1,63 @@
+# --- Part 1: Model Fit ---
+
+library(betareg)
+library(MuMIn)
+library(xtable)
+
+# Load data
+data <- read.csv("data.csv")
+
+# Response adjustment to keep within (0,1)
+epsilon <- 1e-4
+data$PER_normalized <- pmin(pmax(data$PER_normalized, epsilon), 1 - epsilon)
+
+# Define predictors
+physical_metrics <- c("HEIGHT", "WEIGHT", "WINGSPAN", "STANDINGREACH", "BODYFAT")
+drills <- c("BENCH", "LANEAGILITY", "THREEQUARTERSPRINT", "SHUTTLE")
+stats <- c("PTS", "REB", "AST", "STL", "BLK", "FG%", "FT%")
+predictors <- c("POS", physical_metrics, drills, stats)
+
+# Keep only existing predictors
+predictors <- predictors[predictors %in% names(data)]
+
+# Build formula safely
+safe_predictors <- make.names(predictors)
+formula_str <- paste("PER_normalized ~", paste(safe_predictors, collapse = " + "))
+formula <- as.formula(formula_str)
+
+# Drop missing values
+data <- data[complete.cases(data[, c("PER_normalized", predictors)]), ]
+
+# Ensure POS is categorical
+if ("POS" %in% names(data)) {
+  data$POS <- as.factor(data$POS)
+}
+
+# Fit beta regression
+fit_big <- betareg(formula, data = data, link = "logit")
+summary(fit_big)
+
+# Extract metrics
+n_obs <- nrow(data)
+n_players <- length(unique(data$PLAYER))
+log_lik <- logLik(fit_big)
+aic <- AIC(fit_big)
+bic <- BIC(fit_big)
+aicc <- AICc(fit_big)
+pseudo_r2 <- 1 - fit_big$deviance / fit_big$null.deviance
+precision <- fit_big$coef$precision
+
+# Build table
+metrics_table <- data.frame(
+  Model = "Full Model",
+  LogLikelihood = round(log_lik, 2),
+  AIC = round(aic, 2),
+  BIC = round(bic, 2),
+  AICc = round(aicc, 2),
+  PseudoR2 = round(pseudo_r2, 3),
+  Precision = round(precision, 3),
+  Nobs = n_obs,
+  Nplayers = n_players
+)
+
+print(xtable(metrics_table), include.rownames = FALSE)
