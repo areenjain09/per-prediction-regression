@@ -1,0 +1,7 @@
+# --- Load required libraries ---
+library(glmmTMB)      # For beta mixed models
+library(MuMIn)        # For R2 (Note: compatibility with glmmTMB beta models can vary)
+library(multcomp)     # For hypothesis testing (glht)
+library(emmeans)      # For post-hoc tests
+library(DHARMa)       # For residual diagnostics in GLMMs
+library(ggplot2)      # For visualization
