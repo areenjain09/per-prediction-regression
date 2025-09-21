@@ -11,4 +11,6 @@ Player Efficiency Rating (PER) is a NBA league wide metric used to rate players 
 ## Setup
 ### Clone the repository 
 ```
-
+https://github.com/<yourname>/per-prediction-regression.git
+cd per-prediction-regression
+```
