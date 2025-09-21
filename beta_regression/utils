@@ -1,0 +1,21 @@
+# ========================
+# Utility functions
+# ========================
+
+coerce_predictors_to_numeric <- function(df, cols) {
+  for (cn in intersect(cols, names(df))) {
+    if (is.character(df[[cn]])) {
+      x <- gsub("%", "", df[[cn]])
+      x <- gsub(",", "", x)
+      x <- trimws(x)
+      suppressWarnings(df[[cn]] <- as.numeric(x))
+    }
+  }
+  df
+}
+
+finite_rows_only <- function(df) {
+  num_idx <- vapply(df, is.numeric, logical(1))
+  keep <- apply(df[, num_idx, drop = FALSE], 1, function(r) all(is.finite(r)))
+  df[keep, , drop = FALSE]
+}
