@@ -70,7 +70,7 @@ source("plots/predictors")
 
 
 
-## project Structure
+## Project Structure
 ```
 per-prediction-regression/
 ├── beta_regression/
