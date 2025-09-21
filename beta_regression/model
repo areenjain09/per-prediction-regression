@@ -1,63 +1,46 @@
-# --- Part 1: Model Fit ---
+# ========================
+# Fit Beta Regression
+# ========================
 
 library(betareg)
-library(MuMIn)
 library(xtable)
+source("data_preprocessing.R")
 
-# Load data
-data <- read.csv("data.csv")
+# Build formula
+form_safe <- as.formula(paste("PER_normalized_adj ~", paste(found, collapse = " + ")))
+fit_big <- betareg(form_safe, data = data, link = "logit", link.phi = "log", control = betareg.control(maxit=1000))
+sum_fit <- summary(fit_big)
+print(sum_fit)
 
-# Response adjustment to keep within (0,1)
-epsilon <- 1e-4
-data$PER_normalized <- pmin(pmax(data$PER_normalized, epsilon), 1 - epsilon)
-
-# Define predictors
-physical_metrics <- c("HEIGHT", "WEIGHT", "WINGSPAN", "STANDINGREACH", "BODYFAT")
-drills <- c("BENCH", "LANEAGILITY", "THREEQUARTERSPRINT", "SHUTTLE")
-stats <- c("PTS", "REB", "AST", "STL", "BLK", "FG%", "FT%")
-predictors <- c("POS", physical_metrics, drills, stats)
-
-# Keep only existing predictors
-predictors <- predictors[predictors %in% names(data)]
-
-# Build formula safely
-safe_predictors <- make.names(predictors)
-formula_str <- paste("PER_normalized ~", paste(safe_predictors, collapse = " + "))
-formula <- as.formula(formula_str)
-
-# Drop missing values
-data <- data[complete.cases(data[, c("PER_normalized", predictors)]), ]
-
-# Ensure POS is categorical
-if ("POS" %in% names(data)) {
-  data$POS <- as.factor(data$POS)
-}
-
-# Fit beta regression
-fit_big <- betareg(formula, data = data, link = "logit")
-summary(fit_big)
-
-# Extract metrics
-n_obs <- nrow(data)
-n_players <- length(unique(data$PLAYER))
-log_lik <- logLik(fit_big)
+# Extract training metrics
+ll  <- as.numeric(logLik(fit_big))
+k   <- attr(logLik(fit_big), "df")
+n_o <- nobs(fit_big)
 aic <- AIC(fit_big)
 bic <- BIC(fit_big)
-aicc <- AICc(fit_big)
-pseudo_r2 <- 1 - fit_big$deviance / fit_big$null.deviance
-precision <- fit_big$coef$precision
+aicc <- if (n_o - k - 1 > 0) aic + (2 * k * (k + 1)) / (n_o - k - 1) else NA_real_
+pseudo_r2 <- sum_fit$pseudo.r.squared
+phi <- unname(coef(fit_big, model = "precision"))
+dispersion_alt <- 1 / phi
 
-# Build table
-metrics_table <- data.frame(
-  Model = "Full Model",
-  LogLikelihood = round(log_lik, 2),
-  AIC = round(aic, 2),
-  BIC = round(bic, 2),
-  AICc = round(aicc, 2),
-  PseudoR2 = round(pseudo_r2, 3),
-  Precision = round(precision, 3),
-  Nobs = n_obs,
-  Nplayers = n_players
+cat(sprintf("\nTRAIN: logLik=%.1f | AIC=%.1f | AICc=%s | BIC=%.1f | pseudoR2=%.3f | phi=%.2f | 1/phi=%.3f | n=%d\n",
+            ll, aic, ifelse(is.na(aicc), "NA", sprintf("%.1f", aicc)),
+            bic, pseudo_r2, phi, dispersion_alt, n_o))
+
+# LaTeX table for performance
+perf_df <- data.frame(
+  Metric = c("Log-Likelihood (train)","AIC (train)","AICc (train)","BIC (train)",
+             "Pseudo R-squared (train)","Precision (phi, train)","Dispersion (1/phi, train)",
+             "Observations (train)"),
+  Value = c(sprintf("%.1f", ll), sprintf("%.1f", aic),
+            ifelse(is.na(aicc), "NA", sprintf("%.1f", aicc)),
+            sprintf("%.1f", bic), sprintf("%.3f", pseudo_r2),
+            sprintf("%.2f", phi), sprintf("%.3f", dispersion_alt),
+            as.character(n_o)),
+  stringsAsFactors = FALSE
 )
-
-print(xtable(metrics_table), include.rownames = FALSE)
+cat("\n---- START LATEX (Performance) ----\n")
+cat(print(xtable(perf_df, caption="Beta Regression: Model Fit Metrics",
+                 label="tab:beta_perf"), type="latex", booktabs=TRUE, include.rownames=FALSE,
+          caption.placement="top", sanitize.text.function=identity))
+cat("\n---- END LATEX ----\n")
