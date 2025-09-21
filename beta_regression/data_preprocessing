@@ -1,0 +1,27 @@
+# ========================
+# Data preprocessing
+# ========================
+
+library(betareg)
+source("utils.R")
+
+data <- read.csv("models.csv", stringsAsFactors = FALSE)
+
+# Smithson–Verkuilen adjustment to keep target in (0,1)
+n_all <- nrow(data)
+if (!"PER_normalized_adj" %in% names(data)) {
+  data$PER_normalized_adj <- (data$PER_normalized * (n_all - 1) + 0.5) / n_all
+}
+
+# Clamp strictly into (0,1)
+eps <- 1e-8
+data$PER_normalized_adj <- pmin(pmax(data$PER_normalized_adj, eps), 1 - eps)
+
+# Define predictors
+predictors <- c("HGT","WGT","BMI","WNGSPN","STNDVERT","LPVERT",
+                "LANE","SPRINT","PPG","RPG","APG","MPG","POS",
+                "FG","FGA","FG.","X3P","X3PA","FT","FTA","TRB","AST","PTS")
+found <- intersect(predictors, names(data))
+if ("POS" %in% found && !is.factor(data$POS)) data$POS <- factor(data$POS)
+data <- coerce_predictors_to_numeric(data, found)
+data <- finite_rows_only(data)
