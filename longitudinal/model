@@ -1,33 +1,29 @@
+# 03_fit_model.R
+
 library(glmmTMB)
+library(MuMIn)
 
-# --- Load cleaned data ---
-data_clean <- readRDS("data_clean.RDS")
-predictors_to_use <- readRDS("predictors_to_use.RDS")
-response_var <- readRDS("response_var.RDS")
+# Load data and model setup
+data_clean <- readRDS("data_clean.rds")
+model_setup <- readRDS("model_setup.rds")
+formula_beta <- model_setup$formula_beta
 
-# --- Build formula ---
-formula_beta <- as.formula(
-  paste(response_var, "~", paste(predictors_to_use, collapse = " + "), "+ (1 | Player)")
-)
+# Fit beta mixed model
+fit_beta <- glmmTMB(formula_beta, data = data_clean, family = beta_family(), na.action = na.omit)
 
-# --- Fit model ---
-cat("\n=== Fitting Beta Mixed Model ===\n")
-fit_beta_excl <- glmmTMB(formula_beta, data = data_clean, family = beta_family(), na.action = na.omit)
-summary(fit_beta_excl)
+# Model summary
+print(summary(fit_beta))
+print(VarCorr(fit_beta))
+cat("AIC:", AIC(fit_beta), "\n")
+cat("BIC:", BIC(fit_beta), "\n")
 
-# --- Model Fit Statistics ---
-cat("AIC:", AIC(fit_beta_excl), "\n")
-cat("BIC:", BIC(fit_beta_excl), "\n")
+# Compare with null model
+null_model <- glmmTMB(as.formula(paste("PER_beta ~ 1 + (1 | Player)")), data = data_clean, family = beta_family())
+print(anova(null_model, fit_beta))
 
-# --- Compare with Null Model ---
-null_formula_beta <- as.formula(paste(response_var, "~ 1 + (1 | Player)"))
-null_model_beta <- glmmTMB(null_formula_beta, data = data_clean, family = beta_family())
-model_comparison_beta <- anova(null_model_beta, fit_beta_excl)
-print(model_comparison_beta)
+# Predictions
+data_clean$predicted_PER_beta <- predict(fit_beta, type = "response")
+data_clean$predicted_PER_beta_pop <- predict(fit_beta, type = "response", re.form = NA)
 
-# --- Confidence Intervals ---
-confint_beta_wald <- confint(fit_beta_excl, method = "Wald")
-print(confint_beta_wald)
-
-# --- Save fitted model ---
-saveRDS(fit_beta_excl, file = "fit_beta_excl.RDS")
+# Save model and predictions for next script
+saveRDS(list(fit_beta = fit_beta, data_clean = data_clean), "model_fit.rds")
