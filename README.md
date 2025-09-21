@@ -22,7 +22,7 @@ install.packages(c("ggplot2","dplyr","gridExtra","glmmTMB","MuMIn","multcomp","e
 "caret","lme4","lmerTest","parameters","tidyr","stringr"))
 ```
 
-### Data Preprocessing
+## Data Preprocessing
 Go to the relevant analysis folder and run the preprocessing script. For instance:
 ```r
 setwd("path/to/per-prediction-regression")
@@ -32,4 +32,22 @@ or for longitudinal:
 ```r
 setwd("path/to/per-prediction-regression")
 source("longitudinal/data_preprocessing")
+```
+This will clean up the data to have it ready for running the model fits.
+
+## Fit Models
+### Beta Regression Modeling
+```r
+setwd("path/to/per-prediction-regression")
+source("beta_regression/model")
+source("beta_regression/train_test")
+source("beta_regression/deviance_test")
+```
+
+### Longitudinal Modeling
+```r
+setwd("path/to/per-prediction-regression")
+source("longitudinal/model")
+source("longitudinal/hypotheses_test")
+source("longitudinal/deviance_test")
 ```
