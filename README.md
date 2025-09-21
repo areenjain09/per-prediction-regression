@@ -8,5 +8,5 @@ This repository contains all the code, datasets, and visualizations used in the 
 Player Efficiency Rating (PER) is a NBA league wide metric used to rate players on a scale based on their statistics for the season compared to the league statistics. This helps to seperate the role players, starters, superstars, and MVP-caliber players in the league. Being able to predict this value based on college and combine data will help teams and fans know if the player will be a boom or bust.
 
 
-# Setup
-## Clone the repository 
+## Setup
+### Clone the repository 
