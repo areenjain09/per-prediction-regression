@@ -1,19 +1,16 @@
-# --- Part 2: Deviance Test ---
+# ========================
+# Deviance Test
+# ========================
 
-# Fit null (intercept-only) model
-fit_null <- betareg(PER_normalized ~ 1, data = data, link = "logit")
+source("model_fit.R")
 
-# Calculate deviance statistic
-dev_stat <- -2 * (as.numeric(logLik(fit_null)) - as.numeric(logLik(fit_big)))
-df_diff <- attr(logLik(fit_big), "df") - attr(logLik(fit_null), "df")
-p_value <- pchisq(dev_stat, df = df_diff, lower.tail = FALSE)
+form_null <- as.formula("PER_normalized_adj ~ 1")
+fit_null <- betareg(form_null, data = data, link="logit")
 
-cat("Deviance Test:\n")
-cat("Statistic =", round(dev_stat, 2), " | df =", df_diff, " | p =", round(p_value, 4), "\n")
+ll_null <- logLik(fit_null)
+ll_full <- logLik(fit_big)
+deviance_stat <- as.numeric(-2 * (ll_null - ll_full))
+df_test <- attr(ll_full, "df") - attr(ll_null, "df")
+p_value <- pchisq(deviance_stat, df=df_test, lower.tail=FALSE)
 
-# Add to metrics table
-metrics_table$DevianceStat <- round(dev_stat, 2)
-metrics_table$df <- df_diff
-metrics_table$p_value <- round(p_value, 4)
-
-print(xtable(metrics_table), include.rownames = FALSE)
+cat(sprintf("Deviance test: chi2=%.2f | df=%d | p-value=%.4f\n", deviance_stat, df_test, p_value))
