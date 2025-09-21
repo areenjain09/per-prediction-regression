@@ -10,3 +10,7 @@ Player Efficiency Rating (PER) is a NBA league wide metric used to rate players 
 
 ## Setup
 ### Clone the repository 
+'''
+git clone https://github.com/<your-username>/early-sepsis-pred.git
+cd early-sepsis-pred
+'''
