@@ -51,3 +51,13 @@ source("longitudinal/model")
 source("longitudinal/hypotheses_test")
 source("longitudinal/deviance_test")
 ```
+
+## Feature Selection
+### Backward Elimination
+```r
+setwd("path/to/per-prediction-regression")
+source("backward_elimination/script")
+```
+
+### Visualizations
+
