@@ -1,0 +1,168 @@
+# =========================
+# 1) Load Packages
+# =========================
+suppressPackageStartupMessages({
+  library(lme4)
+  library(lmerTest)
+  library(MuMIn)
+  library(parameters)
+  library(dplyr)
+  library(tidyr)
+  library(stringr)
+})
+
+options(contrasts = c("contr.treatment","contr.poly"))
+
+# =========================
+# 2) Load and Clean Data
+# =========================
+csv_path <- "C:/Users/parul/Downloads/dataset/dtm.csv"
+df_raw <- read.csv(csv_path)
+
+min_obs <- 3  # Minimum observations per player
+
+df <- df_raw %>%
+  mutate(
+    Player = as.character(Player),
+    POS = as.factor(POS)
+  ) %>%
+  group_by(Player) %>%
+  filter(n() >= min_obs) %>%
+  ungroup() %>%
+  na.omit()
+
+cat("Unique players:", n_distinct(df$Player), "\n")
+cat("Total observations after cleaning:", nrow(df), "\n")
+
+# =========================
+# 3) Define Predictors + Standardize
+# =========================
+predictors <- c(
+  "HGT","WGT","FG.","X3P.","FT.","MPG","RPG","WNGSPN","STNDVERT","SPRINT","LPVERT",
+  "AST","FT","ORB","STL","BLK","PPG","APG","BMI","LANE","G","POS"
+)
+
+# Scale numeric predictors
+num_preds <- setdiff(intersect(predictors, names(df)), "POS")
+df_std <- df
+df_std[num_preds] <- lapply(df_std[num_preds], function(x) as.numeric(as.character(x)))
+df_std[num_preds] <- lapply(df_std[num_preds], scale)
+
+# =========================
+# 4) Full Model Formula
+# =========================
+form_full <- as.formula(
+  paste("PER_normalized ~", paste(predictors, collapse = " + "), "+ (1 | Player)")
+)
+
+# =========================
+# 5) Backward Elimination Function
+# =========================
+stepwise_drop1 <- function(formula, data, alpha = 0.05, verbose = TRUE) {
+  fit <- tryCatch(lmer(formula, data = data, REML = FALSE),
+                  error = function(e) stop("Initial model could not be fit."))
+  
+  repeat {
+    d1 <- drop1(fit, test = "Chisq")
+    d1 <- d1[!is.na(d1$`Pr(Chi)`), , drop = FALSE]
+    if (nrow(d1) == 0) break
+    
+    worst <- d1[which.max(d1$`Pr(Chi)`), , drop = FALSE]
+    worst_p <- worst$`Pr(Chi)`[1]
+    worst_term <- rownames(worst)[1]
+    
+    if (verbose) message("Worst term: ", worst_term, " (p=", signif(worst_p, 3), ")")
+    if (is.na(worst_p) || worst_p <= alpha) break
+    
+    fit <- tryCatch(update(fit, paste(". ~ . -", worst_term)),
+                    error = function(e) break)
+  }
+  
+  fit_final <- tryCatch(lmer(formula(fit), data = data, REML = TRUE),
+                        error = function(e) fit)
+  list(fit = fit_final, formula = formula(fit_final))
+}
+
+# =========================
+# 6) Perform Backward Elimination
+# =========================
+cat("\n--- Starting Backward Elimination ---\n")
+set.seed(1)
+sw_result <- tryCatch(stepwise_drop1(form_full, df_std, alpha = 0.05),
+                      error = function(e) stop("Backward elimination failed."))
+
+fit_reduced  <- sw_result$fit
+form_reduced <- sw_result$formula
+
+cat("\nReduced model formula:\n"); print(form_reduced)
+cat("\nReduced model summary:\n"); print(summary(fit_reduced))
+
+# =========================
+# 7) Final Model: Significant Predictors Only
+# =========================
+reduced_summary <- summary(fit_reduced)
+coeff_table <- as.data.frame(coef(reduced_summary))
+coeff_table$Term <- rownames(coeff_table)
+
+# Identify p-value column
+p_col <- names(coeff_table)[grep("Pr\\(>", names(coeff_table))[1]]
+if (is.na(p_col)) p_col <- names(coeff_table)[5]
+
+sig_terms <- coeff_table %>% filter(Term != "(Intercept)") %>%
+  filter(!!sym(p_col) < 0.05) %>% pull(Term)
+
+form_final_sig <- if(length(sig_terms) == 0) {
+  as.formula("PER_normalized ~ (1 | Player)")
+} else {
+  as.formula(paste("PER_normalized ~", paste(sig_terms, collapse = " + "), "+ (1 | Player)"))
+}
+
+cat("\nFinal model formula:\n"); print(form_final_sig)
+
+fit_final_sig <- tryCatch(lmer(form_final_sig, data = df_std, REML = TRUE),
+                          error = function(e) lmer("PER_normalized ~ (1 | Player)", data = df_std, REML = TRUE))
+
+cat("\nFinal model summary:\n"); print(summary(fit_final_sig))
+
+# =========================
+# 8) CI, R², Standardized Betas
+# =========================
+cis_final <- tryCatch(confint(fit_final_sig, method = "profile"),
+                      error = function(e) confint(fit_final_sig, method = "Wald"))
+r2_final <- tryCatch(r.squaredGLMM(fit_final_sig), error = function(e) NULL)
+pars_final <- tryCatch(parameters::model_parameters(fit_final_sig, standardize = "basic"), error = function(e) NULL)
+
+cat("\n95% CI:\n"); print(cis_final)
+cat("\nR²:\n"); if(!is.null(r2_final)) print(r2_final)
+cat("\nStandardized betas:\n"); if(!is.null(pars_final)) print(pars_final)
+
+# =========================
+# 9) Individual Mixed Models for Each Predictor
+# =========================
+get_single_beta <- function(var, data) {
+  if(!(var %in% names(data))) return(data.frame(predictor=var, Parameter=NA, Beta=NA, CI_low=NA, CI_high=NA, p=NA))
+  
+  f <- as.formula(paste("PER_normalized ~", var, "+ (1|Player)"))
+  m <- tryCatch(lmer(f, data=data, REML=TRUE), error=function(e) return(NULL))
+  if(is.null(m)) return(data.frame(predictor=var, Parameter=NA, Beta=NA, CI_low=NA, CI_high=NA, p=NA))
+  
+  out <- tryCatch(parameters::model_parameters(m, standardize="basic"), error=function(e) return(NULL))
+  if(is.null(out)) return(data.frame(predictor=var, Parameter=NA, Beta=NA, CI_low=NA, CI_high=NA, p=NA))
+  
+  out$predictor <- var
+  as.data.frame(out)
+}
+
+vars_for_single <- intersect(predictors, names(df_std))
+single_betas <- dplyr::bind_rows(lapply(vars_for_single, get_single_beta, data=df_std))
+if("Std_Coefficient" %in% names(single_betas)) single_betas <- rename(single_betas, Beta=Std_Coefficient)
+
+cat("\nIndividual mixed models — β for all predictors\n")
+print(single_betas)
+
+# =========================
+# 10) Export CSVs
+# =========================
+write.csv(single_betas,  "individual_betas.csv", row.names=FALSE)
+
+cat("\nDone. Final model includes only predictors significant in the backward-eliminated model (or intercept-only if none).\n")
