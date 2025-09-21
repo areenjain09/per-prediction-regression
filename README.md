@@ -59,5 +59,26 @@ setwd("path/to/per-prediction-regression")
 source("backward_elimination/script")
 ```
 
-### Visualizations
+## Visualizations
 
+## project Structure
+```
+per-prediction-regression/
+├── beta_regression/
+│   ├── data_preprocessing
+│   ├── model
+│   ├── train_test
+│   ├── deviance_test
+│   ├── utils
+├── longitudinal/
+│   ├── data_preprocessing
+│   ├── model
+│   ├── hypotheses_tests
+│   └── plots/
+├── backward_elimination/
+│   └── script
+├── plots/
+│   └── predictors
+├── .gitignore
+└── README.md
+```
