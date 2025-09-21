@@ -1,0 +1,41 @@
+library(ggplot2)
+library(DHARMa)
+
+# --- Load model & data ---
+fit_beta_excl <- readRDS("fit_beta_excl.RDS")
+data_clean <- readRDS("data_clean.RDS")
+ranef_beta_excl <- readRDS("ranef_beta_excl.RDS")
+
+# --- Residual Diagnostics ---
+sim_res_excl <- simulateResiduals(fit_beta_excl, n = 250)
+plot(sim_res_excl)
+testResiduals(sim_res_excl)
+
+# --- Predictions ---
+data_clean$predicted_PER_beta_excl <- predict(fit_beta_excl, type = "response")
+data_clean$predicted_PER_beta_pop_excl <- predict(fit_beta_excl, type = "response", re.form = NA)
+
+# --- Random Intercept Plot ---
+ranef_vals <- ranef_beta_excl$cond$Player
+ggplot(data.frame(intercept = ranef_vals[,1]), aes(x = intercept)) +
+  geom_histogram(bins = 30, fill = "steelblue", alpha = 0.7, color = "white") +
+  geom_density(aes(y = ..density.. * 30 * 0.05), color = "red", size = 1) +
+  labs(x = "Random Intercept (Player-level Deviation)", 
+       y = "Frequency",
+       title = "Distribution of Player Random Intercepts",
+       subtitle = "Variation in baseline efficiency beyond observed predictors") +
+  theme_minimal()
+
+# --- Predicted vs Actual Plot ---
+pred_plot_data <- data.frame(
+  Actual = data_clean$PER_beta,
+  Predicted_Individual = data_clean$predicted_PER_beta_excl
+)
+ggplot(pred_plot_data, aes(x = Actual, y = Predicted_Individual)) +
+  geom_point(alpha = 0.3, color = "steelblue") +
+  geom_abline(intercept = 0, slope = 1, color = "red", linetype = "dashed", size = 1) +
+  geom_smooth(method = "lm", se = TRUE, color = "black") +
+  labs(x = "Actual PER (Beta-adjusted)", y = "Predicted PER (Individual-level)",
+       title = "Predicted vs Actual Values",
+       subtitle = "Longitudinal Beta Regression Model Performance") +
+  theme_minimal()
