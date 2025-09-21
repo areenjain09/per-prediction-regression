@@ -1,38 +1,30 @@
-# --- Load required libraries ---
 library(glmmTMB)      # For beta mixed models
-library(MuMIn)        # For R2
-library(dplyr)        # For data manipulation
+library(MuMIn)        # For R2 (compatibility may vary with glmmTMB)
+library(multcomp)     # For hypothesis testing (glht)
+library(emmeans)      # For post-hoc tests
+library(DHARMa)       # For residual diagnostics in GLMMs
+library(ggplot2)      # For visualization
 
-# --- Load Data ---
+# --- Load your data ---
 data <- read.csv("C:/Users/parul/Downloads/dataset/long.csv")
 
-# --- Clean Data ---
+# --- Clean data ---
 data_clean <- na.omit(data)
-data_clean$POS <- as.factor(data_clean$POS)
+data_clean$POS <- as.factor(data_clean$POS)  # Convert position to factor
 
-# --- Check PER range ---
+# --- Check and adjust response for beta regression ---
 cat("\n=== Checking Range of PER_normalized ===\n")
 min_val <- min(data_clean$PER_normalized)
 max_val <- max(data_clean$PER_normalized)
 cat("Min PER_normalized:", min_val, "\n")
 cat("Max PER_normalized:", max_val, "\n")
 
-# --- Adjust PER for beta regression ---
-epsilon <- 0.001
-data_clean$PER_beta <- ifelse(min_val <= 0 | max_val >= 1,
-                              pmax(epsilon, pmin(1 - epsilon, data_clean$PER_normalized)),
-                              data_clean$PER_normalized)
+if (min_val <= 0 || max_val >= 1) {
+  cat("Warning: PER_normalized includes 0 or 1. Adjusting slightly for beta regression.\n")
+  epsilon <- 0.001
+  data_clean$PER_beta <- pmax(epsilon, pmin(1 - epsilon, data_clean$PER_normalized))
+} else {
+  data_clean$PER_beta <- data_clean$PER_normalized
+}
 response_var <- "PER_beta"
-
-# --- Define predictors ---
-per_components <- c("STL", "BLK", "TOV", "pts", "reb", "ast", "MPG", "G")
-core_predictors <- c("HGT", "WGT", "FG.", "X3P.", "FT.", "RPG", "WNGSPN", 
-                     "STNDVERT", "SPRINT", "LPVERT", "BMI", "LANE", "POS", "sznab")
-predictors_to_use <- intersect(core_predictors, colnames(data_clean))
-
-cat("Final predictors:\n", paste(predictors_to_use, collapse = ", "), "\n")
-
-# --- Save cleaned data & predictors ---
-saveRDS(data_clean, file = "data_clean.RDS")
-saveRDS(predictors_to_use, file = "predictors_to_use.RDS")
-saveRDS(response_var, file = "response_var.RDS")
+cat("Response variable set to 'PER_beta'\n")
