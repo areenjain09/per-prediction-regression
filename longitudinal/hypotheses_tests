@@ -1,0 +1,36 @@
+library(multcomp)
+library(emmeans)
+
+# --- Load model & data ---
+fit_beta_excl <- readRDS("fit_beta_excl.RDS")
+data_clean <- readRDS("data_clean.RDS")
+
+# --- Post-hoc tests for POS ---
+if("POS" %in% colnames(data_clean)) {
+  tryCatch({
+    emm_pos_beta <- emmeans(fit_beta_excl, ~ POS, type = "response")
+    print(summary(emm_pos_beta))
+    pairwise_comparisons_beta <- pairs(emm_pos_beta, adjust = "tukey")
+    print(summary(pairwise_comparisons_beta))
+  }, error = function(e) {
+    cat("Error in emmeans/post-hoc for POS:", conditionMessage(e), "\n")
+  })
+}
+
+# --- Specific hypothesis tests (HGT & WGT) ---
+coef_names_cond <- names(fixef(fit_beta_excl)$cond)
+if ("HGT" %in% coef_names_cond && "WGT" %in% coef_names_cond) {
+  K_hw <- matrix(0, nrow = 2, ncol = length(coef_names_cond))
+  K_hw[1, which(coef_names_cond == "HGT")] <- 1
+  K_hw[2, which(coef_names_cond == "WGT")] <- 1
+  rownames(K_hw) <- c("HGT = 0", "WGT = 0")
+  colnames(K_hw) <- coef_names_cond
+
+  glht_fit_hw_excl <- multcomp::glht(fit_beta_excl, linfct = K_hw)
+  print(summary(glht_fit_hw_excl))
+}
+
+# --- Extract Random Effects ---
+ranef_beta_excl <- ranef(fit_beta_excl)
+head(ranef_beta_excl$cond$Player)
+saveRDS(ranef_beta_excl, file = "ranef_beta_excl.RDS")
