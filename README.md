@@ -22,35 +22,14 @@ install.packages(c("ggplot2","dplyr","gridExtra","glmmTMB","MuMIn","multcomp","e
 "caret","lme4","lmerTest","parameters","tidyr","stringr"))
 ```
 
-
-3. **Run Beta Regression Models**
-- Navigate to `beta_regression/`.
-- Run `data_preprocessing` to prepare input data.
-- Use `model` and `train_test` scripts to fit and validate the beta regression.
-- Evaluate results with `deviance_test` and create necessary evaluation plots.
-
-4. **Perform Longitudinal Analysis**
-- Navigate to `longitudinal/`.
-- Preprocess data with `data_preprocessing`.
-- Fit the random-intercept mixed effects model using `model`.
-- Test hypotheses using `hypotheses_tests` and visualize results with scripts in `plots`.
-
-5. **Backward Elimination (Feature Selection)**
-- Go to `backward_elimination/`.
-- Run `script` to perform automated backward elimination on the full model, producing a reduced feature set.
-- Results output model summaries, reduced formulas, and key metrics.
-
-6. **Visualization**
-- Explore the `plots/` directory for all the analytical and diagnostic figures generated in the workflow.
-- Figures include predictor breakdowns, coefficient plots, and longitudinal model results.
-
----
-
-## Notes
-
-- All folders are inter-linked: output from preprocessing steps feeds directly into modeling and visualization scripts.
-- Each folder/module has clear, commented code blocks so you can follow the logic used in the paper.
-- Results and figures are fully reproducible with the provided scripts and dependencies.
-
-For any questions or issues, please open an issue or submit a pull request!  
-
+### Data Preprocessing
+Go to the relevant analysis folder and run the preprocessing script. For instance:
+```r
+setwd("path/to/per-prediction-regression")
+source("beta_regression/data_preprocessing")
+```
+or for longitudinal:
+```r
+setwd("path/to/per-prediction-regression")
+source("longitudinal/data_preprocessing")
+```
