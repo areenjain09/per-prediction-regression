@@ -1,0 +1,33 @@
+library(glmmTMB)
+
+# --- Load cleaned data ---
+data_clean <- readRDS("data_clean.RDS")
+predictors_to_use <- readRDS("predictors_to_use.RDS")
+response_var <- readRDS("response_var.RDS")
+
+# --- Build formula ---
+formula_beta <- as.formula(
+  paste(response_var, "~", paste(predictors_to_use, collapse = " + "), "+ (1 | Player)")
+)
+
+# --- Fit model ---
+cat("\n=== Fitting Beta Mixed Model ===\n")
+fit_beta_excl <- glmmTMB(formula_beta, data = data_clean, family = beta_family(), na.action = na.omit)
+summary(fit_beta_excl)
+
+# --- Model Fit Statistics ---
+cat("AIC:", AIC(fit_beta_excl), "\n")
+cat("BIC:", BIC(fit_beta_excl), "\n")
+
+# --- Compare with Null Model ---
+null_formula_beta <- as.formula(paste(response_var, "~ 1 + (1 | Player)"))
+null_model_beta <- glmmTMB(null_formula_beta, data = data_clean, family = beta_family())
+model_comparison_beta <- anova(null_model_beta, fit_beta_excl)
+print(model_comparison_beta)
+
+# --- Confidence Intervals ---
+confint_beta_wald <- confint(fit_beta_excl, method = "Wald")
+print(confint_beta_wald)
+
+# --- Save fitted model ---
+saveRDS(fit_beta_excl, file = "fit_beta_excl.RDS")
