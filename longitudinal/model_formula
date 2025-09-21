@@ -1,0 +1,23 @@
+# =====================================
+# PART 2: DEFINE PREDICTORS AND MODEL FORMULA
+# =====================================
+
+# --- Identify PER components to exclude ---
+per_components <- c("STL", "BLK", "TOV", "pts", "reb", "ast", "MPG", "G")
+
+# --- Define core predictors (excluding PER components) ---
+core_predictors <- c("HGT", "WGT", "FG.", "X3P.", "FT.", "RPG", "WNGSPN", "STNDVERT", 
+                     "SPRINT", "LPVERT", "BMI", "LANE", "POS", "sznab")
+
+# --- Keep only predictors that exist in data_clean ---
+predictors_to_use <- intersect(core_predictors, colnames(data_clean))
+missing_predictors <- setdiff(core_predictors, predictors_to_use)
+if(length(missing_predictors) > 0){
+  cat("Warning: Missing predictors will be skipped:", paste(missing_predictors, collapse = ", "), "\n")
+}
+cat("Final list of predictors to use:", paste(predictors_to_use, collapse = ", "), "\n")
+
+# --- Build formula for beta regression with random intercept ---
+formula_beta <- as.formula(
+  paste(response_var, "~", paste(predictors_to_use, collapse = " + "), "+ (1 | Player)")
+)
