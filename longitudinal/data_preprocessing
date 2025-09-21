@@ -1,26 +1,22 @@
-# --- Load and Prepare Data ---
-data <- read.csv("C:/Users/parul/Downloads/dataset/long.csv")
+# --- 01_data_prep.R ---
+# Load libraries
+library(betareg)
+library(lme4)
+library(lmtest)
+library(car)
+library(ggplot2)
+library(dplyr)
 
-# Clean missing values
-data_clean <- na.omit(data)
+# Read and prepare longitudinal data
+data_long <- read.csv("long.csv")
 
-# Convert categorical variables
-data_clean$POS <- as.factor(data_clean$POS)
+# Scale efficiency to (0,1) for beta regression
+data_long <- data_long %>%
+  mutate(Scaled_Eff = (EFF - min(EFF, na.rm = TRUE)) / 
+                       (max(EFF, na.rm = TRUE) - min(EFF, na.rm = TRUE)))
 
-# --- Range check for Beta Regression ---
-cat("\n=== Checking Range of PER_normalized ===\n")
-min_val <- min(data_clean$PER_normalized)
-max_val <- max(data_clean$PER_normalized)
-cat("Min PER_normalized:", min_val, "\n")
-cat("Max PER_normalized:", max_val, "\n")
+# Drop unnecessary vars
+exclude_vars <- c("ID", "TEAM", "POS", "EFF")
+predictors <- setdiff(names(data_long), c("Scaled_Eff", exclude_vars))
 
-# Adjust for beta regression boundaries (0,1)
-if (min_val <= 0 || max_val >= 1) {
-  epsilon <- 0.001
-  data_clean$PER_beta <- pmax(epsilon, pmin(1 - epsilon, data_clean$PER_normalized))
-  response_var <- "PER_beta"
-  cat("Adjusted response variable 'PER_beta' created.\n")
-} else {
-  data_clean$PER_beta <- data_clean$PER_normalized
-  response_var <- "PER_beta"
-}
+save(data_long, predictors, file = "beta_reg/data_prep.RData")
