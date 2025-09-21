@@ -1,40 +1,42 @@
-# --- Part 3: Train/Test Evaluation ---
+# ========================
+# Train/Test Evaluation
+# ========================
 
-set.seed(123) # reproducibility
-n <- nrow(data)
-train_idx <- sample(seq_len(n), size = 0.9 * n)
-train_data <- data[train_idx, ]
-test_data <- data[-train_idx, ]
+library(caret)
+source("data_preprocessing.R")
+source("model_fit.R")
 
-# Fit model on training set
-fit_train <- betareg(formula, data = train_data, link = "logit")
+set.seed(123)
+idx <- createDataPartition(data$PER_normalized_adj, p=0.9, list=FALSE)
+train_data <- data[idx, ]
+test_data  <- data[-idx, ]
 
-# Predict on test set
-preds <- predict(fit_train, newdata = test_data, type = "response")
+# Ensure POS factor levels match
+if ("POS" %in% names(train_data)) {
+  train_data$POS <- factor(train_data$POS)
+  test_data$POS  <- factor(test_data$POS, levels = levels(train_data$POS))
+}
 
-# Compare predictions to actual
-mse <- mean((preds - test_data$PER_normalized)^2)
-rmse <- sqrt(mse)
-mae <- mean(abs(preds - test_data$PER_normalized))
+# Predictions
+y_te  <- test_data$PER_normalized_adj
+y_hat <- predict(fit_big, newdata=test_data, type="response")
 
-cat("Test Set Performance:\n")
-cat("MSE =", round(mse, 4), " RMSE =", round(rmse, 4), " MAE =", round(mae, 4), "\n")
+# Evaluation metrics
+rmse <- sqrt(mean((y_te - y_hat)^2))
+mae  <- mean(abs(y_te - y_hat))
+r2_test <- 1 - sum((y_te - y_hat)^2)/sum((y_te - mean(y_te))^2)
 
-# Plot predicted vs actual
-png("pred_vs_actual.png", width = 800, height = 600)
-plot(test_data$PER_normalized, preds,
-     xlab = "Actual PER_normalized", ylab = "Predicted PER_normalized",
-     main = "Predicted vs. Actual PER (Test Set)",
-     pch = 19, col = rgb(0.2, 0.4, 0.6, 0.6))
-abline(0, 1, col = "red", lwd = 2)
+cat(sprintf("TEST: RMSE=%.4f | MAE=%.4f | R2-like=%.3f | n_test=%d\n",
+            rmse, mae, r2_test, nrow(test_data)))
 
-# Add LOWESS trend
-lines(lowess(test_data$PER_normalized, preds), col = "green", lwd = 2)
-
-# Add R²
-r2 <- 1 - sum((test_data$PER_normalized - preds)^2) / 
-          sum((test_data$PER_normalized - mean(test_data$PER_normalized))^2)
-legend("topleft", legend = paste("R² =", round(r2, 3)),
-       bty = "n", cex = 1.2, text.col = "blue")
-
-dev.off()
+# LaTeX table update for test set
+perf_df <- rbind(perf_df, data.frame(
+  Metric = c("Observations (test)","RMSE (test)","MAE (test)","R2-like (test)"),
+  Value = c(as.character(nrow(test_data)), sprintf("%.4f", rmse), sprintf("%.4f", mae), sprintf("%.3f", r2_test)),
+  stringsAsFactors = FALSE
+))
+cat("\n---- START LATEX (Full Performance) ----\n")
+cat(print(xtable(perf_df, caption="Beta Regression: Full Performance Metrics",
+                 label="tab:beta_perf_full"), type="latex", booktabs=TRUE, include.rownames=FALSE,
+          caption.placement="top", sanitize.text.function=identity))
+cat("\n---- END LATEX ----\n")
