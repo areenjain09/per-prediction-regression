@@ -47,19 +47,28 @@ source("beta_regression/deviance_test")
 ### Longitudinal Modeling
 ```r
 setwd("path/to/per-prediction-regression")
+source("longitudinal/model_formula")
 source("longitudinal/model")
-source("longitudinal/hypotheses_test")
-source("longitudinal/deviance_test")
 ```
 
 ## Feature Selection
 ### Backward Elimination
+This script outputs model reduction steps and final significant predictors:
+
 ```r
 setwd("path/to/per-prediction-regression")
 source("backward_elimination/script")
 ```
 
 ## Visualizations
+All plots should fall under the following sections or within their respective code files.
+```r
+setwd("path/to/per-prediction-regression")
+source("longitudinal/plots")
+source("plots/predictors")
+```
+
+
 
 ## project Structure
 ```
